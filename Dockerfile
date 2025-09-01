@@ -37,7 +37,9 @@ WORKDIR /app
 COPY --chown=app:app . .
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /app/data/vector_db /app/data/scraped_content /app/config /app/logs && \
+RUN mkdir -p /app/persistent/data/vector_db /app/persistent/data/scraped_content /app/persistent/config /app/logs && \
+    ln -sf /app/persistent/data /app/data && \
+    ln -sf /app/persistent/config /app/config && \
     chown -R app:app /app
 
 # Switch to non-root user

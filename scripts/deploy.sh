@@ -28,23 +28,15 @@ else
     echo "✅ App already exists: nupo-rag-server"
 fi
 
-# Create volumes if they don't exist
-echo "💾 Setting up persistent volumes..."
+# Create volume if it doesn't exist
+echo "💾 Setting up persistent volume..."
 
-# Check and create data volume
-if ! flyctl volumes list -a nupo-rag-server | grep -q "nupo_rag_data"; then
-    flyctl volumes create nupo_rag_data --region ams --size 10 -a nupo-rag-server
-    echo "✅ Created data volume (10GB)"
+# Check and create storage volume
+if ! flyctl volumes list -a nupo-rag-server | grep -q "nupo_rag_storage"; then
+    flyctl volumes create nupo_rag_storage --region ams --size 10 -a nupo-rag-server
+    echo "✅ Created storage volume (10GB)"
 else
-    echo "✅ Data volume already exists"
-fi
-
-# Check and create config volume
-if ! flyctl volumes list -a nupo-rag-server | grep -q "nupo_rag_config"; then
-    flyctl volumes create nupo_rag_config --region ams --size 1 -a nupo-rag-server
-    echo "✅ Created config volume (1GB)"
-else
-    echo "✅ Config volume already exists"
+    echo "✅ Storage volume already exists"
 fi
 
 # Set secrets (if provided)

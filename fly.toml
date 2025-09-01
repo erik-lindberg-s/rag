@@ -58,14 +58,9 @@ primary_region = "ams"  # Amsterdam - close to Denmark
       Content-Type = "application/json"
 
 [[mounts]]
-  source = "nupo_rag_data"
-  destination = "/app/data"
+  source = "nupo_rag_storage"
+  destination = "/app/persistent"
   initial_size = "10gb"
-
-[[mounts]]
-  source = "nupo_rag_config"
-  destination = "/app/config"
-  initial_size = "1gb"
 
 [http_service]
   internal_port = 8000
