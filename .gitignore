@@ -2,6 +2,7 @@
 .env
 config/.key
 config/api_keys.json
+config/prompts.json
 
 # Python
 __pycache__/
