@@ -1,0 +1,6 @@
+{
+  "store_type": "faiss",
+  "dimension": 1536,
+  "index_type": "IndexFlatL2",
+  "collection_name": "documents"
+}
