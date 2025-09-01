@@ -1653,10 +1653,69 @@ async def get_openai_status():
     }
 
 
-def run_server(host: str = "127.0.0.1", port: int = 8000):
-    """Run the chat server"""
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint for load balancers and monitoring"""
+    try:
+        # Check if RAG pipeline is ready
+        pipeline_ready = rag_pipeline is not None
+        
+        # Check if vector store has data
+        has_data = False
+        if rag_pipeline:
+            try:
+                stats = rag_pipeline.get_stats()
+                has_data = stats.get('total_documents', 0) > 0
+            except:
+                pass
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "pipeline_ready": pipeline_ready,
+            "has_data": has_data,
+            "uptime": "running"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail="Service unhealthy")
+
+
+@app.get("/api/keep-alive")
+async def keep_alive():
+    """Keep-alive endpoint to prevent server from sleeping"""
+    return {
+        "alive": True,
+        "timestamp": datetime.now().isoformat(),
+        "message": "Server is alive and running"
+    }
+
+
+def run_server():
+    """Run the chat server with production configuration"""
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", 8000))
+    
     logger.info(f"Starting RAG Chat Server on http://{host}:{port}")
-    uvicorn.run(app, host=host, port=port)
+    logger.info(f"Environment: {'production' if host == '0.0.0.0' else 'development'}")
+    
+    # Production configuration
+    if host == "0.0.0.0":
+        logger.info("🚀 Running in production mode")
+        uvicorn.run(
+            app, 
+            host=host, 
+            port=port,
+            workers=1,
+            loop="asyncio",
+            http="httptools",
+            access_log=True,
+            log_level="info"
+        )
+    else:
+        # Development configuration
+        logger.info("🔧 Running in development mode")
+        uvicorn.run(app, host=host, port=port, reload=False)
 
 
 if __name__ == "__main__":

@@ -1,272 +1,283 @@
-# 🚀 Nupo AI RAG System - Deployment Guide
+# Fly.io Deployment Guide
 
-## Production-Ready RAG System with OpenAI Embeddings
+## 🚀 Quick Deploy
 
-### 🎯 What This System Provides
-
-- **Stable RAG System**: No crashes, production-ready
-- **OpenAI Embeddings**: Perfect semantic search with `text-embedding-3-small`
-- **FAISS Vector Database**: Fast, reliable document retrieval
-- **Web Interface**: Complete management UI for scraping and testing
-- **API Endpoints**: Ready for webshop integration
-- **Enterprise Ready**: Scalable, maintainable, documented
-
----
-
-## 🛠️ Quick Setup
-
-### 1. Clone Repository
 ```bash
-git clone [YOUR-REPO-URL]
-cd nupo-ai
+# 1. Install flyctl
+curl -L https://fly.io/install.sh | sh
+
+# 2. Login to Fly.io
+flyctl auth login
+
+# 3. Deploy (with optional OpenAI API key)
+OPENAI_API_KEY=your_key_here ./scripts/deploy.sh
 ```
 
-### 2. Run Setup Script
+Your RAG server will be live at: `https://nupo-rag-server.fly.dev`
+
+## 📋 Detailed Setup
+
+### Prerequisites
+
+1. **Fly.io Account**: Sign up at https://fly.io
+2. **flyctl CLI**: Install from https://fly.io/docs/hands-on/install-flyctl/
+3. **OpenAI API Key**: Get from https://platform.openai.com/api-keys
+
+### Step-by-Step Deployment
+
+#### 1. Install flyctl
 ```bash
-./setup.sh
+# macOS/Linux
+curl -L https://fly.io/install.sh | sh
+
+# Or via Homebrew
+brew install flyctl
 ```
 
-### 3. Configure Environment
+#### 2. Login to Fly.io
 ```bash
-# Edit .env file
-nano .env
-
-# Add your OpenAI API key:
-OPENAI_API_KEY=your-actual-api-key-here
+flyctl auth login
 ```
 
-### 4. Start System
+#### 3. Create App and Volumes
 ```bash
-./start_rag_chat.sh
+# Create the app
+flyctl apps create nupo-rag-server --org personal
+
+# Create persistent volumes
+flyctl volumes create nupo_rag_data --region ams --size 10 -a nupo-rag-server
+flyctl volumes create nupo_rag_config --region ams --size 1 -a nupo-rag-server
 ```
 
-### 5. Access Interface
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser
-
----
-
-## 📊 System Architecture
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Web Scraper   │───▶│  OpenAI Embeddings │───▶│  FAISS Database │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                                                │
-         ▼                                                ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│ Management UI   │◀───│   RAG Pipeline   │◀───│ Document Store  │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                        │
-         ▼                        ▼
-┌─────────────────┐    ┌──────────────────┐
-│   API Gateway   │    │  OpenAI GPT-4o   │
-└─────────────────┘    └──────────────────┘
+#### 4. Set Environment Variables
+```bash
+# Set OpenAI API key (optional - can be set via UI)
+flyctl secrets set OPENAI_API_KEY="your_openai_api_key_here" -a nupo-rag-server
 ```
 
----
+#### 5. Deploy
+```bash
+flyctl deploy -a nupo-rag-server
+```
+
+## 🏗️ Architecture
+
+### Persistent Storage
+- **Data Volume** (10GB): `/app/data` - Vector database and scraped content
+- **Config Volume** (1GB): `/app/config` - API keys and configuration
+
+### Auto-Scaling
+- **Min Instances**: 1 (always running)
+- **Max Instances**: 3 (scales under load)
+- **Auto-stop**: Disabled (keeps server alive)
+
+### Health Monitoring
+- **Health Check**: `/api/health` every 10 seconds
+- **Keep-alive**: `/api/keep-alive` endpoint
+- **Status Check**: `/api/status` for system status
 
 ## 🔧 Configuration
 
-### Core Settings (`config/model_config.yaml`)
-```yaml
-embedding_model: "openai"
-vector_db:
-  type: "faiss"
-  dimension: 1536  # OpenAI text-embedding-3-small
-  index_type: "IndexFlatL2"
-```
-
-### Environment Variables (`.env`)
+### Environment Variables
 ```bash
-OPENAI_API_KEY=your-key-here
-HOST=127.0.0.1
-PORT=8000
-LOG_LEVEL=INFO
+PORT=8000                    # Server port
+HOST=0.0.0.0                # Bind to all interfaces
+PYTHONUNBUFFERED=1          # Real-time logs
+FLY_KEEP_ALIVE=1            # Prevent sleeping
 ```
 
----
-
-## 📈 Usage Workflow
-
-### 1. Data Ingestion
-1. Open web interface at `http://127.0.0.1:8000`
-2. Go to "Scrape Websites" tab
-3. Add your website URLs (e.g., `nupo.dk`, `nupo.co.uk`)
-4. Click "Start Scraping"
-5. Wait for completion (will show indexed document count)
-
-### 2. Test RAG System
-1. Go to "Chat" tab
-2. Ask questions about your scraped content
-3. Verify responses are based on your data
-4. Check similarity scores and sources
-
-### 3. API Integration
-```python
-import requests
-
-# Chat endpoint
-response = requests.post('http://127.0.0.1:8000/api/chat', json={
-    'message': 'Is Nupo safe for weight loss?',
-    'max_results': 5,
-    'similarity_threshold': 0.7,
-    'use_ai': True,
-    'include_sources': True
-})
-
-print(response.json())
+### Fly.io Settings
+```toml
+# fly.toml
+auto_stop_machines = false   # Keep running
+auto_start_machines = true   # Auto-restart if crashed
+min_machines_running = 1     # Always 1 instance
 ```
 
----
+## 📊 Monitoring
 
-## 🔌 API Endpoints
-
-### Chat API
-- **POST** `/api/chat` - Main chat interface
-- **GET** `/api/status` - System health check
-- **GET** `/api/stats` - Database statistics
-
-### Data Management
-- **POST** `/api/ingest-websites` - Scrape and index websites
-- **GET** `/api/documents` - List indexed documents
-- **DELETE** `/api/documents/{id}` - Remove document
-
-### Health Monitoring
-- **GET** `/api/health` - System health
-- **GET** `/api/metrics` - Performance metrics
-
----
-
-## 🏢 Production Deployment
-
-### Docker Deployment
-```dockerfile
-FROM python:3.10-slim
-
-WORKDIR /app
-COPY . .
-
-RUN ./setup.sh
-EXPOSE 8000
-
-CMD ["./start_rag_chat.sh"]
-```
-
-### Environment Setup
+### Check Status
 ```bash
-# Production environment
-export OPENAI_API_KEY="your-production-key"
-export HOST="0.0.0.0"
-export PORT="8000"
-export LOG_LEVEL="INFO"
+# App status
+flyctl status -a nupo-rag-server
+
+# View logs
+flyctl logs -a nupo-rag-server
+
+# SSH into container
+flyctl ssh console -a nupo-rag-server
 ```
 
-### Reverse Proxy (Nginx)
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+### Health Endpoints
+- `GET /api/health` - Detailed health check
+- `GET /api/status` - RAG system status
+- `GET /api/keep-alive` - Keep server awake
 
----
+## 💾 Data Persistence
 
-## 📊 Monitoring & Maintenance
+### What's Persisted
+✅ **Vector Database** - FAISS index files  
+✅ **Scraped Content** - All website data  
+✅ **API Keys** - Encrypted storage  
+✅ **Configuration** - System settings  
 
-### Health Checks
+### What's NOT Persisted
+❌ **Logs** - Use `flyctl logs` to view  
+❌ **Temporary Files** - Cleaned on restart  
+❌ **Cache** - Rebuilt automatically  
+
+### Backup Data
 ```bash
-# Check system status
-curl http://127.0.0.1:8000/api/status
+# SSH into container
+flyctl ssh console -a nupo-rag-server
 
-# Check database stats
-curl http://127.0.0.1:8000/api/stats
+# Create backup
+tar -czf /tmp/backup.tar.gz /app/data /app/config
+
+# Download backup (from local machine)
+flyctl ssh sftp get /tmp/backup.tar.gz . -a nupo-rag-server
 ```
 
-### Log Monitoring
+## 🔄 Updates & Maintenance
+
+### Deploy Updates
 ```bash
-# View real-time logs
-tail -f logs/app.log
+# Deploy latest changes
+flyctl deploy -a nupo-rag-server
 
-# Check for errors
-grep "ERROR" logs/app.log
+# Force rebuild
+flyctl deploy --build-only -a nupo-rag-server
 ```
 
-### Performance Metrics
-- **Response Time**: ~17ms average
-- **Embedding Generation**: ~5s per 100 documents
-- **Memory Usage**: ~500MB baseline
-- **Storage**: ~50MB per 1000 documents
+### Scale Resources
+```bash
+# Scale memory/CPU
+flyctl scale vm shared-cpu-2x --memory 4096 -a nupo-rag-server
 
----
+# Scale instances
+flyctl scale count 2 -a nupo-rag-server
+```
 
-## 🔧 Troubleshooting
+### Update Environment
+```bash
+# Update API key
+flyctl secrets set OPENAI_API_KEY="new_key" -a nupo-rag-server
+
+# List secrets
+flyctl secrets list -a nupo-rag-server
+```
+
+## 🐛 Troubleshooting
 
 ### Common Issues
 
-**1. OpenAI API Key Error**
-```
-Error: OPENAI_API_KEY not found
-Solution: Add valid API key to .env file
-```
-
-**2. Empty Database**
-```
-Error: No documents found
-Solution: Run website scraping first
-```
-
-**3. Port Already in Use**
-```
-Error: Port 8000 already in use
-Solution: Kill existing process or change port
-```
-
-### System Recovery
+#### App Won't Start
 ```bash
-# Restart system
-pkill -f start_chat
-./start_rag_chat.sh
+# Check logs
+flyctl logs -a nupo-rag-server
 
-# Reset database
-rm -rf data/vector_db
-# Re-run scraping
+# Check app status
+flyctl status -a nupo-rag-server
+
+# Restart app
+flyctl apps restart nupo-rag-server
 ```
 
+#### Volume Issues
+```bash
+# List volumes
+flyctl volumes list -a nupo-rag-server
+
+# Check volume usage
+flyctl ssh console -a nupo-rag-server
+df -h
+```
+
+#### Performance Issues
+```bash
+# Check resource usage
+flyctl ssh console -a nupo-rag-server
+top
+free -h
+
+# Scale up if needed
+flyctl scale vm shared-cpu-4x --memory 8192 -a nupo-rag-server
+```
+
+### Debug Commands
+```bash
+# View real-time logs
+flyctl logs -f -a nupo-rag-server
+
+# SSH into running container
+flyctl ssh console -a nupo-rag-server
+
+# Check environment variables
+flyctl ssh console -a nupo-rag-server -C "env | grep -E '(PORT|HOST|OPENAI)'"
+
+# Test health endpoint
+curl https://nupo-rag-server.fly.dev/api/health
+```
+
+## 💰 Cost Optimization
+
+### Resource Usage
+- **CPU**: shared-cpu-2x (~$10-15/month)
+- **Memory**: 2GB RAM
+- **Storage**: 11GB volumes (~$2-3/month)
+- **Bandwidth**: First 160GB free
+
+### Cost Reduction Tips
+1. **Use shared CPU** instead of dedicated
+2. **Monitor usage** with `flyctl status`
+3. **Scale down** during low usage periods
+4. **Optimize Docker image** size
+
+## 🔐 Security
+
+### Best Practices
+✅ **API keys encrypted** at rest  
+✅ **HTTPS enforced** for all traffic  
+✅ **Non-root user** in container  
+✅ **Minimal dependencies** in production  
+✅ **Regular security updates**  
+
+### Access Control
+- **Admin access**: Via Fly.io dashboard
+- **SSH access**: `flyctl ssh console`
+- **API access**: Public endpoints (consider auth)
+
+## 📈 Performance
+
+### Expected Performance
+- **Response Time**: < 2 seconds for queries
+- **Throughput**: 50+ concurrent requests
+- **Uptime**: 99.9% with health checks
+- **Memory Usage**: ~1.5GB under load
+
+### Optimization Tips
+1. **Enable caching** for frequent queries
+2. **Use CDN** for static assets
+3. **Monitor logs** for bottlenecks
+4. **Scale horizontally** if needed
+
 ---
 
-## 🎯 Next Steps
+## 🆘 Quick Reference
 
-### Immediate (Production Ready)
-- ✅ Stable RAG system
-- ✅ OpenAI embeddings
-- ✅ Web interface
-- ✅ API endpoints
+### Essential Commands
+```bash
+flyctl deploy -a nupo-rag-server              # Deploy
+flyctl logs -a nupo-rag-server                # View logs
+flyctl ssh console -a nupo-rag-server         # SSH access
+flyctl status -a nupo-rag-server              # Check status
+flyctl scale count 1 -a nupo-rag-server       # Ensure running
+```
 
-### Phase 2 (Enterprise Features)
-- [ ] System prompt management
-- [ ] Multi-tenant support
-- [ ] Custom fine-tuning
-- [ ] Advanced analytics
+### Important URLs
+- **App**: https://nupo-rag-server.fly.dev
+- **Health**: https://nupo-rag-server.fly.dev/api/health
+- **Status**: https://nupo-rag-server.fly.dev/api/status
+- **Dashboard**: https://fly.io/apps/nupo-rag-server
 
-### Phase 3 (Scale)
-- [ ] Load balancing
-- [ ] Database clustering
-- [ ] Auto-scaling
-- [ ] Enterprise SSO
-
----
-
-## 📞 Support
-
-For deployment assistance or customization:
-- Check logs in `logs/app.log`
-- Review configuration in `config/model_config.yaml`
-- Test individual components using the web interface
-
-**System Status**: ✅ Production Ready - No Known Issues
+**Need help?** Check logs first, then visit https://fly.io/docs/
