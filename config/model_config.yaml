@@ -1,0 +1,90 @@
+# Model Configuration
+model:
+  # GPT-OSS Model Selection
+  base_model: "openai/gpt-oss-20b"  # Use 20B for local deployment, 120B for production
+  model_type: "gpt-oss"
+  
+  # Model Parameters
+  max_length: 2048
+  temperature: 0.7
+  top_p: 0.9
+  top_k: 50
+  
+  # Memory and Performance
+  torch_dtype: "float16"  # Use float16 for memory efficiency
+  device_map: "auto"
+  load_in_8bit: false
+  load_in_4bit: true  # Enable 4-bit quantization for lower memory usage
+
+# Fine-tuning Configuration
+fine_tuning:
+  # LoRA Configuration
+  lora:
+    r: 8
+    lora_alpha: 16
+    target_modules: "all-linear"
+    lora_dropout: 0.1
+    bias: "none"
+    task_type: "CAUSAL_LM"
+  
+  # Training Parameters
+  training:
+    learning_rate: 2.0e-4
+    num_train_epochs: 3
+    per_device_train_batch_size: 4
+    per_device_eval_batch_size: 4
+    gradient_accumulation_steps: 4
+    gradient_checkpointing: true
+    warmup_ratio: 0.03
+    lr_scheduler_type: "cosine_with_min_lr"
+    logging_steps: 10
+    save_steps: 500
+    eval_steps: 500
+    save_total_limit: 3
+    
+  # Data Configuration
+  data:
+    max_seq_length: 2048
+    train_split: 0.8
+    validation_split: 0.1
+    test_split: 0.1
+
+# RAG Configuration
+rag:
+  # Vector Database
+  vector_db:
+    type: "faiss"  # Options: faiss, chromadb
+    dimension: 1536  # OpenAI text-embedding-3-small dimension
+    index_type: "IndexFlatL2"
+    
+  # Embedding Model
+  embedding_model: "openai"
+  
+  # Retrieval Parameters
+  retrieval:
+    top_k: 5
+    similarity_threshold: 0.7
+    chunk_size: 512
+    chunk_overlap: 50
+    
+  # Document Processing
+  document_processing:
+    supported_formats: ["txt", "pdf", "docx", "md", "json"]
+    max_document_length: 10000
+
+# Training Environment
+environment:
+  output_dir: "./models/fine_tuned"
+  logging_dir: "./logs"
+  cache_dir: "./cache"
+  data_dir: "./data"
+  
+  # Hardware Configuration
+  use_gpu: true
+  mixed_precision: "fp16"
+  dataloader_num_workers: 4
+  
+  # Monitoring
+  report_to: ["tensorboard", "wandb"]
+  run_name: "gpt-oss-company-training"
+
