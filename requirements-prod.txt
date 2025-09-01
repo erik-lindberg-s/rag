@@ -33,5 +33,9 @@ tqdm>=4.66.0
 # HTTP client
 httpx>=0.25.0
 
+# Document processing
+PyPDF2>=3.0.1
+python-docx>=0.8.11
+
 # Production server optimizations
 gunicorn>=21.2.0
