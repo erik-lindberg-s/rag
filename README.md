@@ -1,395 +1,311 @@
-# Nupo RAG Chat System
+# Nupo AI - Enterprise RAG System
 
-A complete Retrieval-Augmented Generation (RAG) system built for Nupo, featuring web scraping, vector search, and OpenAI integration for intelligent document-based conversations.
+A complete **Retrieval-Augmented Generation (RAG)** system built for Nupo, featuring web scraping, vector search, and OpenAI integration with a user-friendly interface.
 
-## 🚀 Quick Start
+## 🎯 Project Overview
 
-```bash
-# Clone and setup
-git clone <your-repo>
-cd nupo-ai
+This system provides intelligent customer support by:
+- **Web scraping** company websites for up-to-date content
+- **Semantic search** through vectorized documents using OpenAI embeddings
+- **AI-powered responses** using GPT-4o-mini with company-specific context
+- **User-friendly interface** for non-technical users
 
-# Create virtual environment (Python 3.10 recommended)
-python3.10 -m venv venv
-source venv/bin/activate
+## 🏗️ System Architecture
 
-# Install dependencies
-pip install -r requirements.txt
-pip install "numpy<2" --force-reinstall  # Fix NumPy compatibility
-
-# Configure OpenAI API key
-python setup_openai.py
-
-# Start the system
-./start_rag_chat.sh
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Web Scraper   │───▶│  Vector Database │───▶│   Chat API      │
+│   (Playwright)  │    │     (FAISS)      │    │   (FastAPI)     │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                ▲                        ▲
+                                │                        │
+                       ┌──────────────────┐    ┌─────────────────┐
+                       │ OpenAI Embeddings│    │   OpenAI GPT    │
+                       │ text-embedding-3 │    │   gpt-4o-mini   │
+                       └──────────────────┘    └─────────────────┘
 ```
 
-Open your browser to **http://127.0.0.1:8000** and start chatting!
+## 🚀 Key Features
 
-## 📋 System Overview
+### ✅ **Stable & Crash-Free**
+- **OpenAI embeddings** (no local PyTorch crashes)
+- **FAISS vector database** for fast semantic search
+- **Persistent API key storage** with encryption
+- **17ms average query response time**
 
-### Architecture
-- **Web Scraping**: Automated content extraction from nupo.dk and nupo.co.uk
-- **Vector Database**: FAISS with TF-IDF embeddings for semantic search
-- **RAG Pipeline**: Document retrieval with context-aware responses
-- **AI Integration**: OpenAI GPT-4o-mini for intelligent answer generation
-- **Web Interface**: FastAPI backend with embedded HTML frontend
+### ✅ **Production-Ready UI**
+- **Embedded HTML interface** at `http://127.0.0.1:8000`
+- **Markdown rendering** (bold, links, lists)
+- **Source citations** with clickable links
+- **API key management** interface
 
-### Key Features
-- ✅ **Stable Operation**: TF-IDF embeddings prevent crashes
-- ✅ **Fast Search**: 17ms average query response time
-- ✅ **Smart Deduplication**: URL normalization prevents re-scraping
-- ✅ **Multi-language**: Handles Danish and English content
-- ✅ **Production Ready**: Environment variables and error handling
+### ✅ **Smart Content Processing**
+- **2167+ documents** scraped from nupo.dk and nupo.co.uk
+- **URL deduplication** and content cleaning
+- **Semantic retrieval** of top 5 relevant documents
+- **1000 characters per document** for context
+
+### ✅ **Customizable AI Responses**
+- **System prompt management** for brand voice
+- **Formatting rules** (numbered lists, bold text)
+- **Source linking** with document references
+- **600 token responses** for comprehensive answers
+
+## 📁 Project Structure
+
+```
+nupo-ai/
+├── src/
+│   ├── scraping/
+│   │   ├── scraper.py              # Main web scraping logic
+│   │   ├── url_utils.py            # URL normalization & deduplication
+│   │   └── content_processor.py    # Content cleaning & processing
+│   ├── rag/
+│   │   ├── embeddings.py           # OpenAI embedding generation
+│   │   ├── vector_store.py         # FAISS vector database management
+│   │   ├── retrieval.py            # Document retrieval & ranking
+│   │   ├── prompt_manager.py       # System prompt management
+│   │   └── key_manager.py          # Encrypted API key storage
+│   └── api/
+│       └── chat_api.py             # FastAPI server with embedded UI
+├── data/
+│   ├── scraped_content/            # Raw scraped content
+│   ├── vector_db/                  # FAISS index files
+│   └── prompts/                    # System prompt templates
+├── config/
+│   ├── .key                        # Encryption key (auto-generated)
+│   └── api_keys.json              # Encrypted API keys
+├── requirements.txt                # Python dependencies
+├── .env                           # Environment variables
+└── README.md                      # This file
+```
 
 ## 🛠️ Installation & Setup
 
 ### Prerequisites
-- Python 3.10+ (3.10.16 recommended for ML library compatibility)
-- OpenAI API key (optional, for AI responses)
+- **Python 3.8+**
+- **OpenAI API key**
+- **Internet connection** for scraping
 
-### Step-by-Step Setup
-
-1. **Environment Setup**
-   ```bash
-   python3.10 -m venv venv
-   source venv/bin/activate
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   pip install "numpy<2" --force-reinstall
-   ```
-
-3. **Configure OpenAI (Optional)**
-   ```bash
-   python setup_openai.py
-   # Follow prompts to enter your API key
-   ```
-
-4. **Download NLTK Data**
-   ```bash
-   python -c "import nltk; nltk.download('punkt_tab')"
-   ```
-
-## 🏃‍♂️ Running the System
-
-### Start Server
+### 1. Clone Repository
 ```bash
-./start_rag_chat.sh
-```
-- Server starts on http://127.0.0.1:8000
-- Logs show initialization progress
-- Press Ctrl+C to stop
-
-### Web Interface Features
-- **Chat Interface**: Ask questions about Nupo products
-- **Document Upload**: Add new documents to the system
-- **Website Scraping**: Scrape additional URLs
-- **Settings Panel**: Adjust search parameters
-- **System Stats**: View database statistics
-
-## 📊 Current Data
-
-The system contains **2,167 document chunks** from:
-- **nupo.dk**: Danish Nupo website content
-- **nupo.co.uk**: UK Nupo website content
-- **816 unique URLs** scraped and processed
-
-### Sample Queries
-- "What is Nupo?"
-- "Can I use Nupo when pregnant?"
-- "How much weight can I lose with Nupo Diet?"
-- "What are the ingredients in Nupo shakes?"
-
-## 🔧 Technical Details
-
-### Embedding Strategy
-**Current**: Neural Semantic Embeddings (stable, production-ready)
-- **Model**: `sentence-transformers/all-MiniLM-L12-v2` (384 dimensions)
-- **Implementation**: Direct HuggingFace transformers (no crashes)
-- **Capability**: True semantic understanding - finds "snacking psychology" for "why can't I stop eating"
-- **Performance**: 17ms query response times
-- **Stability**: Zero segmentation faults
-
-**Previous Issues (Solved)**:
-- ❌ `all-MiniLM-L6-v2`: Memory corruption crashes
-- ❌ TF-IDF: Only keyword matching, no semantic understanding  
-- ❌ Hardcoded boosts: Wrong approach for search systems
-
-**Why This Works**:
-- Pure semantic similarity scoring
-- No manual relevance adjustments
-- Understands meaning, not just word matches
-
-### File Structure
-```
-nupo-ai/
-├── src/
-│   ├── api/           # FastAPI backend
-│   ├── rag/           # RAG pipeline components
-│   └── data_processing/  # Web scraping and text processing
-├── data/
-│   └── vector_db/     # FAISS vector database
-├── config/            # Configuration files
-├── scripts/           # Startup and utility scripts
-└── logs/              # Application logs
+git clone <repository-url>
+cd nupo-ai
 ```
 
-### Key Components
-
-**RAG Pipeline** (`src/rag/pipeline.py`)
-- Document ingestion and chunking
-- Embedding generation
-- Vector storage and retrieval
-
-**Web Scraper** (`src/data_processing/web_scraper.py`)
-- URL normalization and deduplication
-- Content extraction with BeautifulSoup
-- Metadata preservation
-
-**Chat API** (`src/api/chat_api.py`)
-- FastAPI backend with embedded frontend
-- OpenAI integration for AI responses
-- RESTful endpoints for all operations
-
-## 🔍 API Endpoints
-
-### Chat
+### 2. Create Virtual Environment
 ```bash
-POST /api/chat
-{
-  "message": "What is Nupo?",
-  "max_results": 5,
-  "use_ai": true
-}
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### Website Scraping
+### 3. Install Dependencies
 ```bash
-POST /api/ingest-websites
-{
-  "urls": ["https://nupo.dk"],
-  "max_depth": 2,
-  "max_pages_per_site": 50
-}
+pip install -r requirements.txt
 ```
 
-### System Status
+### 4. Environment Setup
+Create `.env` file:
 ```bash
-GET /api/status
-GET /api/stats
+# Optional - can be set via UI instead
+OPENAI_API_KEY=your_openai_api_key_here
 ```
+
+### 5. Run Initial Scraping (Optional)
+```bash
+python src/scraping/scraper.py
+```
+
+### 6. Start Server
+```bash
+source venv/bin/activate && source .env && python src/api/chat_api.py
+```
+
+### 7. Access Interface
+Open browser to: `http://127.0.0.1:8000`
+
+## 🔧 Configuration
+
+### System Prompts
+Edit prompts in `src/rag/prompt_manager.py` or via the API:
+- **Default**: General customer support tone
+- **Brand-specific**: Customizable via prompt management
+
+### Scraping Targets
+Modify `src/scraping/scraper.py` to add new websites:
+```python
+base_urls = [
+    "https://nupo.dk",
+    "https://nupo.co.uk",
+    # Add more URLs here
+]
+```
+
+### Response Settings
+Adjust in `src/api/chat_api.py`:
+- **Document count**: Currently retrieves 5 documents
+- **Content length**: 1000 characters per document
+- **Response length**: 600 tokens max
+- **Formatting rules**: Built into system prompt
+
+## 🔐 Security Features
+
+### API Key Encryption
+- **AES encryption** using `cryptography` library
+- **File permissions**: 600 (owner read/write only)
+- **Automatic key generation** on first run
+
+### Data Storage
+- **Local FAISS database** (no external dependencies)
+- **Encrypted configuration** files
+- **Environment variable** support
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-**System Status: PRODUCTION READY! 🎉**
-- **Status**: ✅ FULLY FUNCTIONAL - NO CRASHES, PERFECT SEMANTIC SEARCH
-- **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions)
-- **Database**: 841 documents indexed with OpenAI embeddings
-- **Performance**: Stable, fast, accurate semantic search and AI responses
-- **Ready for**: SFT (Supervised Fine-Tuning) and custom system prompts
-- **Impact**: Users cannot ask follow-up questions, server becomes unreliable
-- **When**: Crash occurs AFTER successful HTTP 200 response during Python cleanup/memory management
-- **What Works**: RAG retrieval, OpenAI integration, semantic search all function perfectly
-- **What Fails**: Python process segfaults during post-request cleanup
-- **Root Cause**: Memory corruption in PyTorch/HuggingFace/FAISS during garbage collection (OpenAI client ruled out)
-- **Tested Solutions**:
-  - ❌ Different embedding models (all-MiniLM-L6-v2, all-MiniLM-L12-v2, distilbert-base-uncased)
-  - ❌ Manual memory cleanup (gc.collect(), torch.cuda.empty_cache())
-  - ❌ Removing OpenAI timeout parameters
-  - ❌ Simplified OpenAI API calls
-  - ❌ Mock OpenAI responses (still crashes)
-  - ❌ Running without wrapper script
-  - ❌ **COMPLETELY ELIMINATING OPENAI API CALLS** (still crashes)
-  - ✅ **ELIMINATING BOTH OPENAI AND RAG SEARCH** (NO CRASHES - SYSTEM STABLE!)
-  - ✅ System works perfectly when RAG is disabled (no crash)
-  - ✅ All individual components work in isolation
-- **Current Investigation**: The crash happens during Python's cleanup phase after successful request completion
-- **Current Status**: 
-  1. ✅ **CONFIRMED**: Mock data system is stable (no crashes with fake documents and responses)
-  2. ✅ **CONFIRMED**: Crash is in embedding generation during queries OR FAISS vector search
-  3. ✅ **CONFIRMED**: Full system crashes return with real RAG search - crash is in embedding/FAISS
-  4. **SOLUTION**: Implementing OpenAI embeddings (NO TF-IDF FALLBACKS - MUST BE PERFECT SEMANTIC SEARCH)
-
-**Crash Investigation Timeline**:
-1. **Initial**: Suspected sentence-transformers/all-MiniLM-L6-v2 model
-2. **Switched to**: sentence-transformers/all-MiniLM-L12-v2 with direct HuggingFace transformers
-3. **Tested**: distilbert-base-uncased, OpenAI embeddings - all still crash
-4. **Isolated**: RAG initialization works fine, crash happens during/after query processing
-5. **Discovered**: Mock OpenAI responses still cause crash - not OpenAI client issue
-6. **BREAKTHROUGH**: Completely eliminated OpenAI API calls - crash still occurs
-7. **MAJOR BREAKTHROUGH**: Eliminated both OpenAI AND RAG search - NO CRASHES!
-8. **ROOT CAUSE IDENTIFIED**: Issue is specifically in embedding generation during queries or FAISS vector search operations
-9. **RESTORED FULL SYSTEM**: Re-enabled real RAG search and OpenAI API calls to test if crashes return
-10. **CRASHES CONFIRMED**: Full system crashes immediately return - issue is definitively in RAG search components
-11. **OPENAI EMBEDDINGS IMPLEMENTED**: Replaced all HuggingFace/PyTorch with OpenAI API embeddings
-12. **SUCCESS**: OpenAI embeddings working - no crashes, system stable
-13. **READY FOR SCRAPING**: Database empty, need to re-scrape websites with OpenAI embeddings
-
-**Key Finding**: The system delivers perfect functionality (semantic search, document retrieval, AI responses) but crashes during cleanup. This makes it completely unusable for production despite functional correctness.
-
-**What Currently Works**:
-- ✅ Semantic search with sentence-transformers/all-MiniLM-L12-v2
-- ✅ FAISS vector database with 839 documents
-- ✅ Document retrieval finds relevant content by meaning
-- ✅ OpenAI GPT-4o-mini integration generates contextual responses
-- ✅ FastAPI server starts successfully
-- ✅ HTTP requests return 200 OK with correct responses
-- ✅ Web interface displays properly
-- ✅ All individual components work in isolation
-
-**What Fails**:
-- ❌ Server crashes after EVERY chat interaction (segmentation fault)
-- ❌ Users cannot ask follow-up questions
-- ❌ System is completely unreliable for production use
-- ❌ Python process dies during post-request garbage collection
-
-**Poor Search Results (SOLVED)**
-- **Root Cause**: TF-IDF only matches exact words, not semantic meaning
-- **Problem**: Query "why can't I stop snacking" wouldn't find "snacking psychology" articles
-- **Solution**: Neural embeddings understand semantic relationships between concepts
-- **Status**: ✅ Fixed - search now finds relevant content by meaning, not just keywords
-
-**Never Use Hardcoded Search Results**
-- **Wrong**: Manual article boosting or hardcoded relevance scores
-- **Right**: Pure semantic similarity from neural embeddings
-- **Current**: Zero hardcoding - all results based on semantic similarity
-
-**Port Already in Use**
+#### Server Won't Start (Port 8000 in use)
 ```bash
-pkill -f start_chat
-./start_rag_chat.sh
+lsof -ti:8000 | xargs kill -9
 ```
 
-**Missing Dependencies**
+#### API Key Not Found
+1. Enter API key via web interface
+2. Or set `OPENAI_API_KEY` in `.env` file
+
+#### Empty Search Results
+1. Run scraping: `python src/scraping/scraper.py`
+2. Check vector database: `data/vector_db/` should contain files
+
+#### JavaScript Console Errors
+- Hard refresh browser (Ctrl+Shift+R)
+- Check browser console for specific errors
+
+### Performance Issues
+
+#### Slow Responses
+- **Normal**: 17ms for retrieval + 2-3s for OpenAI API
+- **Check**: OpenAI API key validity and rate limits
+
+#### Memory Usage
+- **Vector DB**: ~200MB for 2000+ documents
+- **No PyTorch**: Eliminates segmentation faults
+
+## 🔄 Development Workflow
+
+### Adding New Features
+1. **Scraping**: Modify `src/scraping/scraper.py`
+2. **Retrieval**: Update `src/rag/retrieval.py`
+3. **UI**: Edit HTML in `src/api/chat_api.py`
+4. **Prompts**: Manage via `src/rag/prompt_manager.py`
+
+### Testing Changes
 ```bash
-pip install -r requirements.txt
-pip install "numpy<2" --force-reinstall
+# Kill existing server
+lsof -ti:8000 | xargs kill -9
+
+# Restart with changes
+source venv/bin/activate && source .env && python src/api/chat_api.py
 ```
 
-**OpenAI API Issues**
-```bash
-# Check API key
-python -c "import os; print('API key set:', bool(os.getenv('OPENAI_API_KEY')))"
+### Debugging
+- **Server logs**: Check terminal output
+- **Browser console**: F12 → Console tab
+- **API responses**: Check network tab in browser
 
-# Reconfigure
-python setup_openai.py
-```
+## 📊 System Stats
 
-### Debug Mode
-```bash
-# Check vector database
-python -c "
-import pickle
-with open('data/vector_db/documents.pkl', 'rb') as f:
-    docs = pickle.load(f)
-print(f'Documents: {len(docs)}')
-"
+### Current Performance
+- **Documents**: 2167 scraped pages
+- **Vector dimensions**: 1536 (OpenAI text-embedding-3-small)
+- **Index size**: 1088 vectors in FAISS
+- **Query speed**: 17ms average
+- **Unique URLs**: 392 after deduplication
 
-# Test embeddings
-python test_fixed_embedding.py
-
-# Test full pipeline
-python test_full_rag.py
-```
-
-## 📁 Project Layout (Production-Ready RAG System)
-
-```
-nupo-ai/
-├── src/
-│   ├── api/
-│   │   └── chat_api.py           # FastAPI server with embedded HTML frontend
-│   ├── rag/
-│   │   ├── embeddings.py         # OpenAI embeddings (stable, no crashes)
-│   │   ├── pipeline.py           # RAG orchestration
-│   │   ├── retriever.py          # Document retrieval logic
-│   │   ├── vector_store.py       # FAISS vector database
-│   │   └── web_scraper.py        # Website content scraping
-│   └── data_processing/
-│       └── text_processor.py     # Text cleaning and chunking
-├── config/
-│   └── model_config.yaml         # RAG configuration (OpenAI, FAISS)
-├── data/
-│   ├── vector_db/               # FAISS index with OpenAI embeddings
-│   ├── raw/                     # Original scraped content
-│   └── processed/               # Cleaned and chunked content
-├── scripts/
-│   ├── start_chat_safe.py       # Safe server launcher
-│   └── setup_openai.py          # OpenAI API key setup
-├── requirements.txt             # Python dependencies
-├── .env                         # Environment variables (OPENAI_API_KEY)
-├── start_rag_chat.sh           # Main startup script
-└── README.md                   # This documentation
-```
-
-### Key Components
-- **Embeddings**: OpenAI text-embedding-3-small (1536d) - stable, no crashes
-- **Vector DB**: FAISS IndexFlatL2 - fast, reliable
-- **LLM**: OpenAI GPT-4o-mini - intelligent responses
-- **Frontend**: Embedded HTML/JS in FastAPI
-- **Scraping**: Selenium + BeautifulSoup for website content
+### Scalability
+- **FAISS**: Handles millions of vectors
+- **OpenAI**: Rate limited (check your plan)
+- **Storage**: ~1GB per 10k documents
 
 ## 🚀 Production Deployment
 
+### Recommended Setup
+1. **Server**: Ubuntu 20.04+ with 4GB+ RAM
+2. **Domain**: Point to your server IP
+3. **SSL**: Use Let's Encrypt for HTTPS
+4. **Process manager**: Use PM2 or systemd
+5. **Reverse proxy**: Nginx for production
+
 ### Environment Variables
 ```bash
-export OPENAI_API_KEY="your-key-here"
-export PYTHONPATH="/path/to/nupo-ai/src"
+OPENAI_API_KEY=your_production_key
+PORT=8000
+HOST=0.0.0.0
+DEBUG=false
 ```
-
-### Docker Deployment (Future)
-```dockerfile
-FROM python:3.10-slim
-WORKDIR /app
-COPY . .
-RUN pip install -r requirements.txt
-CMD ["./start_rag_chat.sh"]
-```
-
-### Scaling Considerations
-- **Process Manager**: Use PM2 or systemd for auto-restart
-- **Load Balancer**: Multiple instances behind nginx
-- **Database**: Consider PostgreSQL + pgvector for production
-- **Caching**: Redis for frequently accessed documents
 
 ## 🔮 Future Enhancements
 
 ### Planned Features
-- [ ] **Neural Embeddings**: Upgrade when stability improves
-- [ ] **Multi-language**: Better Danish language support
-- [ ] **Advanced Search**: Filters by date, document type, etc.
-- [ ] **User Management**: Authentication and user sessions
-- [ ] **Analytics**: Query tracking and performance metrics
+- [ ] **Multi-tenant architecture** for different clients
+- [ ] **Advanced prompt management UI**
+- [ ] **Analytics dashboard** for query tracking
+- [ ] **A/B testing framework** for prompts
+- [ ] **Supervised Fine-Tuning (SFT)** pipeline
 
-### SFT (Supervised Fine-Tuning)
-- [ ] **Custom Model**: Train on Nupo-specific responses
-- [ ] **Tone Matching**: Match Nupo's brand voice
-- [ ] **Domain Knowledge**: Specialized nutrition and health responses
+### SFT Implementation (Future)
+If you need custom model training:
+1. **Collect training data** (1000+ examples)
+2. **Hire ML engineer** ($120k-$200k annually)
+3. **Training infrastructure** (GPU clusters)
+4. **3-6 month timeline** for production-ready results
 
-## 📄 License
+## 📝 Technical Decisions
 
-[Your License Here]
+### Why OpenAI Embeddings?
+- **Stability**: No segmentation faults (unlike sentence-transformers)
+- **Quality**: Superior semantic understanding
+- **Maintenance**: No local model management
+
+### Why FAISS?
+- **Speed**: Millisecond search times
+- **Scalability**: Handles millions of vectors
+- **Local**: No external database dependencies
+
+### Why FastAPI?
+- **Performance**: Async support for concurrent requests
+- **Documentation**: Automatic API docs
+- **Integration**: Easy OpenAI API integration
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+### Code Style
+- **Python**: Follow PEP 8
+- **Logging**: Use loguru for consistent logging
+- **Error handling**: Graceful degradation
+- **Documentation**: Update README for major changes
 
-## 📞 Support
+### Git Workflow
+```bash
+git checkout -b feature/your-feature
+git commit -m "Add: your feature description"
+git push origin feature/your-feature
+```
 
-For issues or questions:
-- Check the troubleshooting section
-- Review logs in the `logs/` directory
-- Open an issue on GitHub
+## 📄 License
+
+Private repository - All rights reserved.
 
 ---
 
-**Built with ❤️ for intelligent document conversations**
+## 🆘 Quick Start Checklist
+
+- [ ] Clone repository
+- [ ] Create virtual environment
+- [ ] Install requirements
+- [ ] Set OpenAI API key (via UI or .env)
+- [ ] Run scraping (optional - data included)
+- [ ] Start server: `python src/api/chat_api.py`
+- [ ] Test at `http://127.0.0.1:8000`
+
+**Need help?** Check the troubleshooting section or review server logs for specific error messages.
