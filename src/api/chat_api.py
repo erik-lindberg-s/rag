@@ -1653,32 +1653,20 @@ async def get_openai_status():
     }
 
 
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "Nupo RAG Server is running", "status": "ok"}
+
+
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint for load balancers and monitoring"""
-    try:
-        # Check if RAG pipeline is ready
-        pipeline_ready = rag_pipeline is not None
-        
-        # Check if vector store has data
-        has_data = False
-        if rag_pipeline:
-            try:
-                stats = rag_pipeline.get_stats()
-                has_data = stats.get('total_documents', 0) > 0
-            except:
-                pass
-        
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "pipeline_ready": pipeline_ready,
-            "has_data": has_data,
-            "uptime": "running"
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+    """Simple health check endpoint for load balancers and monitoring"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "service": "nupo-rag-server"
+    }
 
 
 @app.get("/api/keep-alive")
