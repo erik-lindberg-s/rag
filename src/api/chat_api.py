@@ -666,18 +666,10 @@ async def get_chat_interface():
                 </div>
                 
                 <div id="chat-tab" class="tab-content active">
-                    <div class="chat-header">
-                        <h1>🤖 RAG Chat Assistant</h1>
-                        <p>Ask questions about your uploaded documents!</p>
-                    </div>
+
                     
                     <div class="chat-messages" id="chat-messages">
-                    <div class="welcome-message">
-                        <h3>👋 Welcome to your RAG Chat System!</h3>
-                        <p>Upload some documents on the left, then ask me questions about them.</p>
-                        <p>I'll search through your documents and give you smart answers with sources!</p>
                     </div>
-                </div>
                 
                     <div class="chat-input">
                         <input type="text" id="message-input" placeholder="Ask a question about your documents..." onkeypress="if(event.key==='Enter') sendMessage()">
