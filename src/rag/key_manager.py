@@ -14,12 +14,31 @@ from typing import Optional
 class APIKeyManager:
     """Manages secure storage and retrieval of API keys."""
     
-    def __init__(self, storage_path: str = "config/api_keys.json"):
-        self.storage_path = Path(storage_path)
-        self.storage_path.parent.mkdir(exist_ok=True)
+    def __init__(self, storage_path: Optional[str] = None):
+        """Initialize key storage, preferring persistent volume if available.
         
+        On Fly.io we mount a volume at /app/persistent. We store keys under
+        /app/persistent/config so keys survive restarts and deploys.
+        """
+        # Determine base config directory
+        try:
+            persistent_root = os.getenv('PERSISTENT_DIR', '/app/persistent')
+            if storage_path:
+                base_dir = Path(storage_path).parent
+            elif os.path.isdir(persistent_root):
+                base_dir = Path(persistent_root) / 'config'
+            else:
+                base_dir = Path('config')
+        except Exception:
+            base_dir = Path('config')
+
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        # Files
+        self.storage_path = base_dir / 'api_keys.json'
+        self.key_file = base_dir / '.key'
+
         # Generate or load encryption key
-        self.key_file = Path("config/.key")
         self.encryption_key = self._get_or_create_key()
         self.cipher = Fernet(self.encryption_key)
         

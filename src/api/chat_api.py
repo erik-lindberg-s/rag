@@ -1766,7 +1766,7 @@ async def keep_alive():
 
 def run_server():
     """Run the chat server with production configuration"""
-    host = os.getenv("HOST", "127.0.0.1")
+    host = os.getenv("HOST", "0.0.0.0")  # Default to 0.0.0.0 for Fly.io
     port = int(os.getenv("PORT", 8000))
     
     logger.info(f"Starting RAG Chat Server on http://{host}:{port}")

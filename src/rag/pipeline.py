@@ -84,11 +84,32 @@ class RAGPipeline:
         
         # Initialize vector store
         vector_config = self.config.get('vector_db', {})
+        # Persist vector DB on Fly volume if present
+        import os, shutil
+        persistent_root = os.getenv('PERSISTENT_DIR', '/app/persistent')
+        default_persist = f"{persistent_root}/vector_db" if os.path.isdir(persistent_root) else './data/vector_db'
+
+        # One-time migration: move existing local index to persistent volume if empty
+        try:
+            persistent_dir = Path(default_persist)
+            local_dir = Path('./data/vector_db')
+            persistent_dir.mkdir(parents=True, exist_ok=True)
+            has_persistent_index = (persistent_dir / 'index.faiss').exists()
+            has_local_index = (local_dir / 'index.faiss').exists()
+            if not has_persistent_index and has_local_index and persistent_dir.as_posix() != local_dir.as_posix():
+                logger.info(f"Migrating existing vector index from {local_dir} to {persistent_dir}...")
+                for src in ['index.faiss', 'documents.pkl', 'id_to_index.pkl', 'config.json']:
+                    s = local_dir / src
+                    if s.exists():
+                        shutil.copy2(s, persistent_dir / src)
+                logger.info("Vector index migration completed")
+        except Exception as mig_e:
+            logger.warning(f"Vector index migration skipped: {mig_e}")
         self.components['vector_store'] = VectorStore(
             store_type=vector_config.get('type', 'faiss'),
             dimension=self.components['embedding_generator'].embedding_dim,
             index_type=vector_config.get('index_type', 'IndexFlatL2'),
-            persist_path=vector_config.get('persist_path', './data/vector_db')
+            persist_path=vector_config.get('persist_path', default_persist)
         )
         
         # Initialize document retriever
