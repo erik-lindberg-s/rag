@@ -8,6 +8,7 @@ import openai
 import os
 from typing import List, Dict, Any, Optional, Union
 from loguru import logger
+from rag.key_manager import APIKeyManager
 
 class EmbeddingGenerator:
     """Generate embeddings using OpenAI API - stable, no crashes."""
@@ -15,7 +16,9 @@ class EmbeddingGenerator:
     def __init__(self, 
                  model_name: str = "openai",
                  device: Optional[str] = None,
-                 batch_size: int = 20):
+                 batch_size: int = 20,
+                 api_key: Optional[str] = None,
+                 client: Optional[openai.OpenAI] = None):
         """
         Initialize OpenAI embedding generator.
         
@@ -28,12 +31,20 @@ class EmbeddingGenerator:
         self.batch_size = batch_size
         self.embedding_dim = 1536  # OpenAI text-embedding-3-small dimension
         
-        # Initialize OpenAI client
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            raise Exception("OPENAI_API_KEY environment variable is required")
-        
-        self.openai_client = openai.OpenAI(api_key=api_key)
+        # Initialize OpenAI client (use provided client/key or secure storage)
+        if client is not None:
+            self.openai_client = client
+        else:
+            final_key = api_key
+            if not final_key:
+                try:
+                    key_manager = APIKeyManager()
+                    final_key = key_manager.get_openai_key()
+                except Exception:
+                    final_key = None
+            if not final_key:
+                raise Exception("OpenAI API key is not configured. Please set it via the UI.")
+            self.openai_client = openai.OpenAI(api_key=final_key)
         
         logger.info("✅ Using OpenAI embeddings for stable, crash-free semantic search")
         logger.info("🚀 NO LOCAL PYTORCH/TRANSFORMERS - NO CRASHES!")

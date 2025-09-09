@@ -5,6 +5,7 @@ This is like creating a phone line that your chat interface can call!
 
 import os
 import sys
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import asyncio
@@ -35,6 +36,31 @@ class ChatMessage(BaseModel):
     include_sources: bool = True
     use_ai: bool = True  # Whether to use OpenAI for response generation
     prompt_id: Optional[str] = None  # Which prompt template to use
+
+
+class ProductInfo(BaseModel):
+    """Structured information extracted from sources"""
+    name: Optional[str] = None
+    handle: Optional[str] = None
+    handle_type: Optional[str] = None  # "product", "page", "collection", "blog"
+    url: Optional[str] = None
+    calories: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class StructuredChatResponse(BaseModel):
+    """Structured response format optimized for MCP consumption"""
+    message: str
+    response: Optional[str] = None  # Back-compat for UIs expecting `response`
+    results: List[ProductInfo] = []  # Generic list with handle_type set per item
+    products: Optional[List[ProductInfo]] = None  # Back-compat: only items with handle_type=="product"
+    count: int = 0
+    query_time: float
+    success: bool
+    error: Optional[str] = None
+    raw_sources: List[Dict[str, Any]] = []  # Original sources for debugging
 
 
 class ChatResponse(BaseModel):
@@ -116,23 +142,18 @@ def initialize_openai():
     """Initialize OpenAI client if API key is available"""
     global openai_client, key_manager
     
-    # Try to get API key from storage first, then environment
+    # Only use key from secure storage (ignore environment variable)
     api_key = None
     if key_manager:
         api_key = key_manager.get_openai_key()
         if api_key:
             logger.info("Using OpenAI API key from secure storage")
     
-    if not api_key:
-        api_key = os.getenv('OPENAI_API_KEY')
-        if api_key:
-            logger.info("Using OpenAI API key from environment variable")
-    
     if api_key:
         openai_client = openai.OpenAI(api_key=api_key)
         logger.info("OpenAI client initialized successfully")
     else:
-        logger.warning("No OpenAI API key found in storage or environment variables")
+        logger.warning("No OpenAI API key found in secure storage")
 
 def _format_response_with_sources(response: str, sources: List[Dict[str, Any]]) -> str:
     """
@@ -176,9 +197,113 @@ def _format_response_with_sources(response: str, sources: List[Dict[str, Any]]) 
     
     return formatted_response
 
+def _extract_product_info(sources: List[Dict[str, Any]]) -> List[ProductInfo]:
+    """Extract structured information from sources with proper URL type detection"""
+    products = []
+    
+    for source in sources:
+        content = source.get('content', source.get('snippet', ''))
+        url = source.get('url', '')
+        title = source.get('title', '')
+        
+        # Skip if no URL - we need real URLs for MCP
+        if not url:
+            continue
+            
+        # Initialize product info
+        product = ProductInfo()
+        product.url = url
+        
+        # Extract name from title or content
+        if title:
+            product.name = title.strip()
+        elif content:
+            first_line = content.split('\n')[0].strip()
+            if len(first_line) < 100:
+                product.name = first_line
+        
+        # Detect URL type and extract handle
+        if '/products/' in url:
+            product.handle_type = "product"
+            handle = url.split('/products/')[-1].split('?')[0].split('#')[0].rstrip('/')
+            product.handle = handle
+        elif '/pages/' in url:
+            product.handle_type = "page"
+            handle = url.split('/pages/')[-1].split('?')[0].split('#')[0].rstrip('/')
+            product.handle = handle
+        elif '/collections/' in url:
+            product.handle_type = "collection"
+            handle = url.split('/collections/')[-1].split('?')[0].split('#')[0].rstrip('/')
+            product.handle = handle
+        elif '/blogs/' in url:
+            product.handle_type = "blog"
+            # For blogs, extract both blog name and article handle
+            blog_path = url.split('/blogs/')[-1].split('?')[0].split('#')[0].rstrip('/')
+            product.handle = blog_path
+        else:
+            # Unknown URL type, try to extract from path
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            path_parts = [p for p in parsed.path.split('/') if p]
+            if len(path_parts) >= 2:
+                product.handle_type = path_parts[0] if path_parts[0] else "unknown"
+                product.handle = '/'.join(path_parts[1:]) if len(path_parts) > 1 else path_parts[0]
+            else:
+                product.handle_type = "page"
+                product.handle = path_parts[0] if path_parts else "home"
+        
+        # Extract calories for products
+        if product.handle_type == "product":
+            calorie_patterns = [
+                r'(\d+)\s*kcal',
+                r'(\d+)\s*calories',
+                r'calories[:\s]*(\d+)',
+                r'energy[:\s]*(\d+)\s*kcal'
+            ]
+            
+            for pattern in calorie_patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    product.calories = f"{match.group(1)} kcal"
+                    break
+        
+        # Extract price for products
+        if product.handle_type == "product":
+            price_patterns = [
+                r'£(\d+\.?\d*)',
+                r'\$(\d+\.?\d*)',
+                r'€(\d+\.?\d*)',
+                r'price[:\s]*[£$€]?(\d+\.?\d*)',
+                r'(\d+\.?\d*)\s*[£$€]'
+            ]
+            
+            for pattern in price_patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    currency_symbol = '£' if '£' in pattern else '$' if '$' in pattern else '€' if '€' in pattern else '£'
+                    product.price = f"{currency_symbol}{match.group(1)}"
+                    break
+        
+        # Extract description (first meaningful sentence)
+        sentences = content.split('. ')
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) > 20 and len(sentence) < 300:
+                # Clean up common prefixes
+                sentence = re.sub(r'^(Product|Description|Details?|Page|Article)[:;\s]*', '', sentence, flags=re.IGNORECASE)
+                product.description = sentence.strip()
+                if product.description:
+                    break
+        
+        # Only add if we have required fields
+        if product.handle and product.handle_type:
+            products.append(product)
+    
+    return products
+
+
 def _enhance_response_formatting(text: str) -> str:
     """Apply additional formatting improvements to make responses more readable."""
-    import re
     
     # Ensure proper spacing after numbered lists
     text = re.sub(r'(\d+\.)\s*([A-Z])', r'\1 **\2', text)  # Bold first word after numbers
@@ -197,7 +322,7 @@ def _enhance_response_formatting(text: str) -> str:
 async def generate_ai_response(query: str, sources: List[Dict[str, Any]], fallback_message: str = None, prompt_id: str = None) -> str:
     """Generate AI response using OpenAI with RAG context"""
     if not openai_client:
-        return fallback_message or "AI response generation is not available (missing API key)"
+        raise Exception("OpenAI client not available - missing API key")
     
     try:
         # Prepare context from retrieved documents (use all retrieved sources)
@@ -219,24 +344,9 @@ async def generate_ai_response(query: str, sources: List[Dict[str, Any]], fallba
             # Auto-suggest prompt based on query
             prompt_id = prompt_manager.suggest_prompt(query) if prompt_manager else "default"
         
-        # Get base system prompt and enhance with formatting instructions
-        base_system_prompt = prompt_manager.get_system_prompt(prompt_id) if prompt_manager else "You are a helpful assistant for Nupo. Answer based on the provided context. Be concise and professional."
-        
-        # Add global formatting instructions to all prompts
-        formatting_instructions = """
-
-FORMATTING RULES (ALWAYS FOLLOW):
-1. When providing multiple points or steps, ALWAYS use numbered lists like:
-   1. First point
-   2. Second point  
-   3. Third point
-2. Use bullet points (-) for sub-items under main points
-3. Use **bold** for important terms, product names, and key concepts
-4. Keep paragraphs short (2-3 sentences max)
-5. Structure your response with clear logical flow
-6. Start new lines for each numbered item - don't put them all in one paragraph"""
-
-        system_prompt = base_system_prompt + formatting_instructions
+        # Get base system prompt (no human-facing formatting rules; MCP consumes JSON)
+        base_system_prompt = prompt_manager.get_system_prompt(prompt_id) if prompt_manager else "You are a backend assistant. Answer strictly based on context."
+        system_prompt = base_system_prompt
 
         user_prompt = f"Context: {context}\n\nQuestion: {query}\n\nAnswer:"
 
@@ -294,8 +404,8 @@ def initialize_rag():
         prompt_manager = PromptManager()
         logger.info("Prompt manager initialized successfully!")
         
-        # Check for API key from storage or environment
-        api_key = key_manager.get_openai_key() or os.getenv('OPENAI_API_KEY')
+        # Check for API key from secure storage only
+        api_key = key_manager.get_openai_key()
         
         # Try to initialize RAG pipeline (needs OpenAI key)
         if api_key:
@@ -318,7 +428,7 @@ async def startup_event():
     """This runs when we start our API server"""
     logger.info("Starting RAG Chat API...")
     success = initialize_rag()
-    initialize_openai()  # Initialize OpenAI client
+    initialize_openai()  # Initialize OpenAI client from secure storage only
     if not success:
         logger.error("Failed to initialize RAG system!")
 
@@ -822,25 +932,16 @@ async def get_chat_interface():
                     // Remove loading message
                     loadingDiv.remove();
                     
+                    // Always show raw structured JSON for debug/verification
+                    try {
+                        addMessage('<pre style="white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;background:#f8f9fa;border:1px solid #eee;padding:10px;border-radius:8px;">' +
+                                   JSON.stringify(data, null, 2) + '</pre>', 'bot');
+                    } catch (e) {}
+                    
                     if (data.success) {
-                        let botMessage = data.response;
-                        let sourcesHtml = '';
-                        
-                        if (data.include_sources && data.sources.length > 0) {
-                            sourcesHtml = '<div class="sources"><strong>📚 Sources:</strong>';
-                            data.sources.forEach((source, index) => {
-                                sourcesHtml += `
-                                    <div class="source-item">
-                                        <strong>${source.filename || 'Unknown'}</strong> 
-                                        (Score: ${(source.similarity_score || 0).toFixed(3)})
-                                        <br><em>${source.snippet || 'No snippet available'}</em>
-                                    </div>
-                                `;
-                            });
-                            sourcesHtml += '</div>';
-                        }
-                        
-                        addMessage(botMessage + sourcesHtml, 'bot');
+                        // Prefer structured fields
+                        let botMessage = data.response || data.message || '✅';
+                        addMessage(botMessage, 'bot');
                     } else {
                         addMessage(`❌ Error: ${data.error}`, 'bot');
                     }
@@ -1190,11 +1291,10 @@ async def get_chat_interface():
     return html_content
 
 
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat_with_rag(message_data: ChatMessage):
+@app.post("/api/chat/structured", response_model=StructuredChatResponse)
+async def structured_chat_with_rag(message_data: ChatMessage):
     """
-    Chat endpoint - this is where the magic happens!
-    When someone asks a question, we search our documents and give a smart answer.
+    Structured chat endpoint - returns product information in a structured format for MCP consumption
     """
     if not rag_pipeline:
         raise HTTPException(status_code=500, detail="RAG system not initialized")
@@ -1209,70 +1309,64 @@ async def chat_with_rag(message_data: ChatMessage):
         )
         
         if not search_result['success']:
-            return ChatResponse(
-                response="Sorry, I couldn't search the documents right now.",
-                sources=[],
-                query_time=search_result.get('search_time', 0),
-                total_sources=0,
-                success=False,
-                error=search_result.get('error', 'Unknown error')
-            )
+            raise HTTPException(status_code=500, detail=search_result.get('error', 'Search failed'))
         
-        # Create a response based on the found documents
         sources = search_result['results']
         
+        # Must have sources to proceed - no fallbacks
         if not sources:
-            if message_data.use_ai and os.getenv('OPENAI_API_KEY'):
-                response_text = await generate_ai_response(
-                    message_data.message, 
-                    [], 
-                    "I couldn't find specific information in your company documents.",
-                    message_data.prompt_id
-                )
-            else:
-                response_text = """🤔 I couldn't find any relevant information in your documents for that question. 
-                
-Try:
-- Asking about topics that are covered in your uploaded documents
-- Using different keywords
-- Lowering the similarity threshold in the settings"""
-        else:
-            if message_data.use_ai and os.getenv('OPENAI_API_KEY'):
-                try:
-                    response_text = await generate_ai_response(message_data.message, sources, None, message_data.prompt_id)
-                except Exception as ai_error:
-                    logger.error(f"OpenAI call failed: {ai_error}")
-                    response_text = f"""📚 Found relevant information in your documents, but AI response failed.
-
-Raw info: {sources[0].get('snippet', 'Information found in your documents.')[:200]}...
-
-I found {len(sources)} relevant document(s)."""
-            else:
-                # Fallback to simple response
-                response_text = f"""📚 Based on your documents, here's what I found:
-
-{sources[0].get('snippet', 'Information found in your documents.')}
-
-I found {len(sources)} relevant document(s) that might help answer your question."""
+            raise HTTPException(status_code=404, detail="No relevant information found")
         
-        return ChatResponse(
-            response=response_text,
-            sources=sources if message_data.include_sources else [],
+        # Extract structured information from sources
+        products = _extract_product_info(sources)
+        
+        # Must have AI response - require initialized OpenAI client from secure storage
+        if not message_data.use_ai or openai_client is None:
+            raise HTTPException(status_code=503, detail="AI response generation required but not available")
+        
+        # Generate real AI response
+        try:
+            message = await generate_ai_response(message_data.message, sources, None, message_data.prompt_id)
+            if not message or not message.strip():
+                raise HTTPException(status_code=500, detail="AI failed to generate response")
+        except Exception as ai_error:
+            logger.error(f"OpenAI call failed: {ai_error}")
+            raise HTTPException(status_code=500, detail=f"AI response generation failed: {str(ai_error)}")
+        
+        # Build results (generic) and products (back-compat)
+        results = products
+        products_only = [p for p in products if getattr(p, 'handle_type', None) == "product"] or None
+        
+        structured = StructuredChatResponse(
+            message=message,
+            response=message,
+            results=results,
+            products=products_only,
+            count=len(results),
             query_time=search_result['search_time'],
-            total_sources=len(sources),
-            success=True
+            success=True,
+            raw_sources=sources if message_data.include_sources else []
         )
+        # Log structured payload for debugging/MCP integration visibility
+        try:
+            import json as _json
+            logger.info("STRUCTURED RESPONSE (chat/structured): " + _json.dumps(structured.dict(), ensure_ascii=False)[:2000])
+        except Exception:
+            pass
+        return structured
         
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        logger.error(f"Error in chat endpoint: {e}")
-        return ChatResponse(
-            response="Sorry, there was an error processing your question.",
-            sources=[],
-            query_time=0,
-            total_sources=0,
-            success=False,
-            error=str(e)
-        )
+        logger.error(f"Structured chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+
+@app.post("/api/chat", response_model=StructuredChatResponse)
+async def chat_with_rag(message_data: ChatMessage):
+    """Return the same structured JSON as /api/chat/structured."""
+    return await structured_chat_with_rag(message_data)
 
 
 @app.post("/api/upload", response_model=DocumentUploadResponse)
@@ -1606,7 +1700,6 @@ async def set_openai_key(key_data: dict):
             logger.warning("Failed to save API key to storage, using session only")
         
         openai_client = test_client
-        os.environ['OPENAI_API_KEY'] = api_key
         
         # Initialize RAG pipeline if not already initialized
         if rag_pipeline is None:
@@ -1638,10 +1731,10 @@ async def set_openai_key(key_data: dict):
 
 @app.get("/api/openai-status")
 async def get_openai_status():
-    """Check if OpenAI API key is configured"""
+    """Check if OpenAI API key is configured (secure storage only)"""
     return {
         "configured": openai_client is not None,
-        "has_env_key": bool(os.getenv('OPENAI_API_KEY'))
+        "source": "secure_storage" if openai_client is not None else None
     }
 
 
